@@ -89,6 +89,30 @@ app.post('/api/contato', async (req, res) => {
   }
 });
 
+// ✅ BUSCAR TODAS AS RECEITAS
+app.get('/api/receitas', async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT * FROM receitas');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar receitas.' });
+  }
+});
+
+// ✅ ADICIONAR NOVA RECEITA
+app.post('/api/receitas', async (req, res) => {
+  const { titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes } = req.body;
+  try {
+    await pool.execute(
+      'INSERT INTO receitas (titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes) VALUES (?, ?, ?, ?, ?, ?)',
+      [titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes]
+    );
+    res.json({ mensagem: 'Receita adicionada com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao salvar receita.' });
+  }
+});
+
 app.listen(process.env.PORT, () => {
   console.log(`Servidor rodando na porta ${process.env.PORT}`);
 });
