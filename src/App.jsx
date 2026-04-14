@@ -26,28 +26,63 @@ function App() {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) setCurrentUser(savedUser);
 
-    fetch('http://localhost:3001/api/receitas')
-      .then(res => res.json())
-      .then(data => {
-        // Formata os dados do banco para o React entender (com ingredientes e instruções)
-        const locais = data.map(r => ({
-          id: r.id,
-          title: r.titulo,
-          image: r.imagem,
-          prepTime: r.tempo_preparo,
-          difficulty: r.dificuldade,
+    const carregarTudoInicalmente = async () => {
+      try {
+        // A. Busca do seu Banco MySQL Local
+        const resLocal = await fetch('http://localhost:3001/api/receitas');
+        const dataLocal = await resLocal.json();
+        const locais = dataLocal.map(r => ({
+          id: r.id, title: r.titulo, image: r.imagem, prepTime: r.tempo_preparo, difficulty: r.dificuldade,
           ingredients: r.ingredientes ? r.ingredientes.split(',') : [],
           instructions: r.instrucoes ? r.instrucoes.split('.') : []
         }));
-        setRecipes(locais);
-      })
-      .catch(err => console.error("Erro local:", err));
+
+        // B. Busca Receitas Populares na Nuvem (API TheMealDB)
+        const resGlobal = await fetch('https://www.themealdb.com/api/json/v1/1/search.php?s=');
+        const dataGlobal = await resGlobal.json();
+        let globais = [];
+        
+        if (dataGlobal.meals) {
+          // Pega as 8 primeiras para misturar com as suas locais
+          globais = dataGlobal.meals.slice(0, 8).map(m => {
+            const ing = [];
+            for (let i = 1; i <= 20; i++) {
+              if (m[`strIngredient${i}`] && m[`strIngredient${i}`].trim() !== '') {
+                ing.push(`${m[`strMeasure${i}`]} ${m[`strIngredient${i}`]}`);
+              }
+            }
+            return {
+              id: `api-${m.idMeal}`, title: m.strMeal, image: m.strMealThumb, prepTime: "Consultar", difficulty: "Global",
+              ingredients: ing.length > 0 ? ing : ["Ingredientes não detalhados nesta busca rápida."],
+              instructions: m.strInstructions ? m.strInstructions.split(/\r?\n/).filter(l => l.trim() !== '').map(l => l.replace(/^\d+[\.\)-]\s*/, '').trim()) : ["Instruções não detalhadas nesta busca rápida."],
+              isGlobal: true
+            };
+          });
+        }
+
+        // C. Junta as Locais com as Globais na mesma tela!
+        setRecipes([...locais, ...globais]);
+
+      } catch (err) {
+        console.error("Erro ao carregar dados iniciais:", err);
+      }
+    };
+
+    carregarTudoInicalmente();
   }, []);
 
   // 2. Salva Favoritos no navegador
   useEffect(() => {
     localStorage.setItem("favorites", JSON.stringify(favorites));
   }, [favorites]);
+
+  useEffect(() => {
+    const escutarBotaoVoltar = () => {
+      setSelectedRecipe(null); // Fecha a receita se o usuário apertar voltar
+    };
+    window.addEventListener("popstate", escutarBotaoVoltar);
+    return () => window.removeEventListener("popstate", escutarBotaoVoltar);
+  }, []);
 
   // 3. Busca Global (TheMealDB)
   const handleGlobalSearch = async (query, mode) => {
@@ -104,6 +139,8 @@ function App() {
 
   // 4. Nova função: Busca os detalhes completos ao clicar
   const handleRecipeClick = async (recipe) => {
+
+    window.history.pushState({ receitaAberta: true }, "", `#receita-${recipe.id}`);
     // Se não for da API global, ou se já tiver ingredientes reais, abre a receita direto
     if (!recipe.isGlobal || (recipe.ingredients && recipe.ingredients[0] !== "Ingredientes não detalhados nesta busca rápida.")) {
       setSelectedRecipe(recipe);
@@ -160,6 +197,8 @@ function App() {
       {activeSection === "home" && <Hero />}
       
       <main className="container">
+        
+        {/* SEÇÃO HOME (Busca e Listagem) */}
         {activeSection === "home" && (
           <section className="section active">
             
@@ -170,9 +209,15 @@ function App() {
                 <h2 className="section-title">Receitas</h2>
                 <div className="recipes-grid">
                   {recipes.map(recipe => (
-                    // Aqui eu devolvi a função de "clique" na receita!
                     <div key={recipe.id} onClick={() => handleRecipeClick(recipe)} style={{cursor: 'pointer'}}>
-                      <RecipeCard recipe={recipe} isFavorite={favorites.includes(recipe.id)} onToggleFavorite={handleToggleFavorite} />
+                      <RecipeCard 
+                        recipe={recipe} 
+                        isFavorite={favorites.includes(recipe.id)} 
+                        onToggleFavorite={(id, e) => {
+                          e.stopPropagation(); // 🛡️ Impede de abrir a receita ao favoritar
+                          handleToggleFavorite(id);
+                        }} 
+                      />
                     </div>
                   ))}
                 </div>
@@ -182,7 +227,11 @@ function App() {
             {/* TELA 2: DETALHES DA RECEITA (Quando você clica nela) */}
             {selectedRecipe && (
               <div className="recipe-detail active">
-                <button className="back-btn" onClick={() => setSelectedRecipe(null)} style={{ marginBottom: '20px', cursor: 'pointer', padding: '10px', backgroundColor: '#eee', border: 'none', borderRadius: '5px' }}>
+                <button 
+                  className="back-btn" 
+                  onClick={() => window.history.back()} 
+                  style={{ marginBottom: '20px', cursor: 'pointer', padding: '10px', backgroundColor: '#eee', border: 'none', borderRadius: '5px' }}
+                >
                   ← Voltar para a lista
                 </button>
                 <h2 className="section-title">{selectedRecipe.title}</h2>
@@ -216,12 +265,50 @@ function App() {
                 </div>
               </div>
             )}
-
           </section>
         )}
 
+        {/* ✅ SEÇÃO DE FAVORITOS (O "buraquinho" que faltava) */}
+        {activeSection === "favorites" && (
+          <section className="section active">
+            <h2 className="section-title">Minhas Receitas Favoritas</h2>
+            {favorites.length === 0 ? (
+              <p style={{textAlign: 'center', marginTop: '20px'}}>Você ainda não tem receitas favoritas. ❤️</p>
+            ) : (
+              <div className="recipes-grid">
+                {recipes.filter(r => favorites.includes(r.id)).map(recipe => (
+                  <div key={recipe.id} onClick={() => {
+                    handleRecipeClick(recipe);
+                    setActiveSection("home"); // Volta pra home para abrir a receita
+                  }} style={{cursor: 'pointer'}}>
+                    <RecipeCard 
+                      recipe={recipe} 
+                      isFavorite={true} 
+                      onToggleFavorite={(id, e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite(id);
+                      }} 
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ✅ SEÇÃO DE ADICIONAR RECEITA (O formulário fantasma) */}
+        {activeSection === "add-recipe" && (
+          <section className="section active">
+            <RecipeForm onRecipeAdded={() => {
+              setActiveSection("home");
+            }} />
+          </section>
+        )}
+
+        {/* SEÇÕES DE CONTATO E LOGIN */}
         {activeSection === "contact" && <Contact />}
         {activeSection === "login" && <Login setCurrentUser={setCurrentUser} setActiveSection={setActiveSection} />}
+        
       </main>
       <Footer />
     </div>

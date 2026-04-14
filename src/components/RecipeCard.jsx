@@ -19,15 +19,11 @@ const RecipeCard = ({ recipe, isFavorite, onToggleFavorite }) => {
 
         <div className="recipe-actions">
           <button className="btn btn-primary">Ver Receita</button>
-          <button
+          <button 
             className={`favorite-btn ${isFavorite ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(recipe.id);
-            }}
-            title={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            onClick={(e) => onToggleFavorite(recipe.id, e)} // 👈 Passa o 'e' para o stopPropagation
           >
-            <i className={isFavorite ? 'fas fa-heart' : 'far fa-heart'}></i>
+            {isFavorite ? '❤️' : '🤍'}
           </button>
         </div>
       </div>
