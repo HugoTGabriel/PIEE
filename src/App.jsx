@@ -1,218 +1,228 @@
 import React, { useState, useEffect } from "react";
-// Importando os pedaços do site (componentes)
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import RecipeCard from "./components/RecipeCard";
-import Footer from "./components/Footer";
 import SearchBar from "./components/SearchBar";
 import Contact from "./components/Contact";
 import Login from "./components/Login";
-
-// Importando o CSS para o site ficar bonito
+import Footer from "./components/Footer";
 import "./App.css";
 
 function App() {
-  // 1. ESTADOS (A nossa "Lousa de Pedidos")
-  // Aqui guardamos a lista de receitas
   const [recipes, setRecipes] = useState([]);
-  // Aqui guardamos quem está logado (null significa ninguém)
   const [currentUser, setCurrentUser] = useState(null);
-  // Aqui controlamos qual página aparece (home, favoritos, etc)
   const [activeSection, setActiveSection] = useState("home");
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [favorites, setFavorites] = useState(() => {
-  // Tenta ler os favoritos guardados no navegador
-  const savedFavorites = localStorage.getItem("favorites");
-  // Se existirem, transforma o texto de volta em lista (JSON.parse)
-  // Se não existirem, começa com uma lista vazia []
-  return savedFavorites ? JSON.parse(savedFavorites) : [];
-});
-  // Adicione isso junto com as outras funções (perto do handleLogout)
-const handleToggleFavorite = (id) => {
-  setFavorites(prev =>
-    prev.includes(id) ? prev.filter(fav => fav !== id) : [...prev, id]
-  );
-};
-
-  // 2. EFEITO INICIAL (Roda assim que o site abre)
   
-useEffect(() => {
+  // Variável que guarda a receita clicada
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+  
+  const [favorites, setFavorites] = useState(() => {
+    const saved = localStorage.getItem("favorites");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 1. Carrega as receitas locais do MySQL
+  useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) setCurrentUser(savedUser);
 
-    // Busca as receitas do seu servidor Node
     fetch('http://localhost:3001/api/receitas')
       .then(res => res.json())
       .then(data => {
-        // Mapeamos os nomes do banco para o que o seu componente espera
-        const formattedRecipes = data.map(r => ({
+        // Formata os dados do banco para o React entender (com ingredientes e instruções)
+        const locais = data.map(r => ({
           id: r.id,
           title: r.titulo,
           image: r.imagem,
           prepTime: r.tempo_preparo,
           difficulty: r.dificuldade,
-          ingredients: r.ingredientes?.split(','), // Transforma string em lista
-          instructions: r.instrucoes?.split('.')
+          ingredients: r.ingredientes ? r.ingredientes.split(',') : [],
+          instructions: r.instrucoes ? r.instrucoes.split('.') : []
         }));
-        setRecipes(formattedRecipes);
+        setRecipes(locais);
       })
-      .catch(err => console.error("Erro ao carregar receitas:", err));
+      .catch(err => console.error("Erro local:", err));
   }, []);
 
-  // 3. FUNÇÕES (A Lógica)
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem("currentUser");
-    setActiveSection("home");
+  // 2. Salva Favoritos no navegador
+  useEffect(() => {
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+  }, [favorites]);
+
+  // 3. Busca Global (TheMealDB)
+  const handleGlobalSearch = async (query, mode) => {
+    if (!query) return;
+    const url = mode === 'ingrediente' 
+      ? `https://www.themealdb.com/api/json/v1/1/filter.php?i=${query}`
+      : `https://www.themealdb.com/api/json/v1/1/search.php?s=${query}`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.meals) {
+        const globalRecipes = data.meals.map(m => {
+          
+          // Juntando os ingredientes que a API manda separados
+          const ing = [];
+          for (let i = 1; i <= 20; i++) {
+            if (m[`strIngredient${i}`] && m[`strIngredient${i}`].trim() !== '') {
+              ing.push(`${m[`strMeasure${i}`]} ${m[`strIngredient${i}`]}`);
+            }
+          }
+          
+          return {
+            id: `api-${m.idMeal}`,
+            title: m.strMeal,
+            image: m.strMealThumb,
+            prepTime: "Consultar",
+            difficulty: "Global",
+            // Se for busca por ingrediente, a API não manda as instruções junto, avisamos na tela:
+            ingredients: ing.length > 0 ? ing : ["Ingredientes não detalhados nesta busca rápida."],
+            instructions: m.strInstructions 
+              ? m.strInstructions
+                  .split(/\r?\n/)
+                  .filter(l => l.trim() !== '') 
+                  .map(l => l.replace(/^\d+[\.\)-]\s*/, '').trim()) 
+              : ["Instruções não detalhadas nesta busca rápida."],
+            isGlobal: true
+          };
+        });
+        setRecipes(globalRecipes);
+        // Volta para a lista caso o usuário já esteja com alguma receita aberta
+        setSelectedRecipe(null); 
+      } else {
+        alert("Nenhuma receita encontrada no banco global para essa busca.");
+      }
+    } catch (err) {
+      console.error("Erro API:", err);
+    }
   };
-  const filteredRecipes = recipes.filter(recipe =>
-  recipe.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-// Este código corre sempre que a lista de 'favorites' mudar
-useEffect(() => {
-  // Guarda a lista de favoritos convertida em texto (JSON.stringify)
-  localStorage.setItem("favorites", JSON.stringify(favorites));
-}, [favorites]); // O [favorites] diz ao React para vigiar especificamente esta variável
+  const handleToggleFavorite = (id) => {
+    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
 
-  // 4. O QUE APARECE NA TELA (O Desenho)
+  // 4. Nova função: Busca os detalhes completos ao clicar
+  const handleRecipeClick = async (recipe) => {
+    // Se não for da API global, ou se já tiver ingredientes reais, abre a receita direto
+    if (!recipe.isGlobal || (recipe.ingredients && recipe.ingredients[0] !== "Ingredientes não detalhados nesta busca rápida.")) {
+      setSelectedRecipe(recipe);
+      return;
+    }
+
+    // Se a receita está "incompleta", pedimos os detalhes para a API usando o ID dela
+    try {
+      const idReal = recipe.id.replace('api-', ''); // Tira o 'api-' que colocamos antes
+      const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idReal}`);
+      const data = await res.json();
+      
+      if (data.meals && data.meals[0]) {
+        const m = data.meals[0];
+        const ing = [];
+        // Mapeia os 20 espaços de ingredientes de novo
+        for (let i = 1; i <= 20; i++) {
+          if (m[`strIngredient${i}`] && m[`strIngredient${i}`].trim() !== '') {
+            ing.push(`${m[`strMeasure${i}`]} ${m[`strIngredient${i}`]}`);
+          }
+        }
+        
+        // Atualiza a nossa receita com os dados novos e completos
+        const receitaCompleta = {
+          ...recipe,
+          ingredients: ing,
+          instructions: m.strInstructions 
+            ? m.strInstructions
+                .split(/\r?\n/)
+                .filter(l => l.trim() !== '')
+                .map(l => l.replace(/^\d+[\.\)-]\s*/, '').trim())
+            : ["Instruções não disponíveis."]
+        };
+        
+        setSelectedRecipe(receitaCompleta); // Abre a tela com tudo preenchido!
+      }
+    } catch (err) {
+      console.error("Erro ao buscar detalhes da receita:", err);
+      setSelectedRecipe(recipe); // Se der erro na internet, abre incompleta mesmo
+    }
+  };
+
   return (
     <div className="app-container">
-      {/* Garante que o CSS do 'header' se aplique ao redor da Navbar */}
       <header>
         <div className="container">
-          <Navbar 
-            currentUser={currentUser} 
-            setActiveSection={setActiveSection} 
-            onLogout={handleLogout} 
-          />
+          <Navbar currentUser={currentUser} setActiveSection={(sec) => {
+            setActiveSection(sec);
+            setSelectedRecipe(null); // Limpa a receita selecionada ao trocar de aba
+          }} onLogout={() => setCurrentUser(null)} />
         </div>
       </header>
-
+      
       {activeSection === "home" && <Hero />}
-
-      {/* 3. O 'container' do seu CSS centraliza o conteúdo */}
+      
       <main className="container">
+        {activeSection === "home" && (
+          <section className="section active">
+            
+            {/* TELA 1: LISTA DE RECEITAS E BARRA DE BUSCA */}
+            {!selectedRecipe && (
+              <>
+                <SearchBar onSearch={handleGlobalSearch} />
+                <h2 className="section-title">Receitas</h2>
+                <div className="recipes-grid">
+                  {recipes.map(recipe => (
+                    // Aqui eu devolvi a função de "clique" na receita!
+                    <div key={recipe.id} onClick={() => handleRecipeClick(recipe)} style={{cursor: 'pointer'}}>
+                      <RecipeCard recipe={recipe} isFavorite={favorites.includes(recipe.id)} onToggleFavorite={handleToggleFavorite} />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
-      {activeSection === "contact" && <Contact />}
-        
-      {/* SEÇÃO HOME */}
-{activeSection === "home" && (
-  <section className="section active">
+            {/* TELA 2: DETALHES DA RECEITA (Quando você clica nela) */}
+            {selectedRecipe && (
+              <div className="recipe-detail active">
+                <button className="back-btn" onClick={() => setSelectedRecipe(null)} style={{ marginBottom: '20px', cursor: 'pointer', padding: '10px', backgroundColor: '#eee', border: 'none', borderRadius: '5px' }}>
+                  ← Voltar para a lista
+                </button>
+                <h2 className="section-title">{selectedRecipe.title}</h2>
+                <img src={selectedRecipe.image} className="recipe-detail-img" alt={selectedRecipe.title} style={{ maxWidth: '100%', borderRadius: '10px' }} />
+                
+                <div className="recipe-info" style={{display: 'flex', gap: '20px', justifyContent: 'center', margin: '20px 0'}}>
+                  <p><strong>🕒 Tempo:</strong> {selectedRecipe.prepTime}</p>
+                  <p><strong>📊 Dificuldade:</strong> {selectedRecipe.difficulty}</p>
+                </div>
 
-    {!selectedRecipe && (
-      <>
-        <SearchBar onSearch={setSearchQuery} />
-        <h2 className="section-title">Receitas Recentes</h2>
-        <div className="recipes-grid">
-          {filteredRecipes.length > 0 ? (
-            filteredRecipes.map((recipe) => (
-              <div key={recipe.id} onClick={() => setSelectedRecipe(recipe)} style={{cursor: 'pointer'}}>
-                <RecipeCard
-  recipe={recipe}
-  isFavorite={favorites.includes(recipe.id)}
-  onToggleFavorite={handleToggleFavorite}
-/>
+                <div className="ingredients" style={{ textAlign: 'left', maxWidth: '600px', margin: '0 auto' }}>
+                  <h3>Ingredientes</h3>
+                  <ul>
+                    {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 ? (
+                      selectedRecipe.ingredients.map((ing, index) => <li key={index}>{ing}</li>)
+                    ) : (
+                      <li>Nenhum ingrediente detalhado.</li>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="instructions" style={{ textAlign: 'left', maxWidth: '600px', margin: '20px auto' }}>
+                  <h3>Modo de Preparo</h3>
+                  <ol>
+                    {selectedRecipe.instructions && selectedRecipe.instructions.length > 0 ? (
+                      selectedRecipe.instructions.map((inst, index) => <li key={index}>{inst}</li>)
+                    ) : (
+                      <li>Nenhuma instrução detalhada.</li>
+                    )}
+                  </ol>
+                </div>
               </div>
-            ))
-          ) : (
-            <p style={{textAlign: 'center', color: '#777', gridColumn: '1/-1'}}>
-              Nenhuma receita encontrada para "<strong>{searchQuery}</strong>"
-            </p>
-          )}
-        </div>
-      </>
-    )}
-
-    {selectedRecipe && (
-      <div className="recipe-detail active">
-        <button className="back-btn" onClick={() => setSelectedRecipe(null)}>
-          ← Voltar para a lista
-        </button>
-        <h2 className="section-title" style={{marginTop: '20px'}}>{selectedRecipe.title}</h2>
-        <img 
-          src={selectedRecipe.image || "https://images.unsplash.com/photo-1495195129352-aec325a55b65?auto=format&fit=crop&w=600&q=80"} 
-          className="recipe-detail-img" 
-          alt={selectedRecipe.title} 
-        />
-        <div className="recipe-info" style={{display: 'flex', gap: '20px', justifyContent: 'center', alignItems: 'center', margin: '20px 0'}}>
-  <p><strong>🕒 Tempo:</strong> {selectedRecipe.prepTime || "N/A"}</p>
-  <p><strong>📊 Dificuldade:</strong> {selectedRecipe.difficulty || "N/A"}</p>
-  <button
-    className={`favorite-btn ${favorites.includes(selectedRecipe.id) ? 'active' : ''}`}
-    onClick={() => handleToggleFavorite(selectedRecipe.id)}
-    title={favorites.includes(selectedRecipe.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-    style={{fontSize: '1.5rem'}}
-  >
-    <i className={favorites.includes(selectedRecipe.id) ? 'fas fa-heart' : 'far fa-heart'}></i>
-  </button>
-</div>
-        <div className="ingredients">
-          <h3>Ingredientes</h3>
-          <ul>
-            {selectedRecipe.ingredients?.length > 0 ? (
-              selectedRecipe.ingredients.map((ing, index) => <li key={index}>{ing}</li>)
-            ) : (
-              <li>Nenhum ingrediente cadastrado.</li>
             )}
-          </ul>
-        </div>
-        <div className="instructions" style={{marginTop: '20px'}}>
-          <h3>Modo de Preparo</h3>
-          <ol>
-            {selectedRecipe.instructions?.length > 0 ? (
-              selectedRecipe.instructions.map((inst, index) => <li key={index}>{inst}</li>)
-            ) : (
-              <li>Nenhuma instrução cadastrada.</li>
-            )}
-          </ol>
-        </div>
-      </div>
-    )}
 
-  </section>
-)} 
-{/* SEÇÃO FAVORITOS */}
-{activeSection === "favorites" && (
-  <section className="section active">
-    <h2 className="section-title">Minhas Receitas Favoritas</h2>
+          </section>
+        )}
 
-    {favorites.length === 0 ? (
-      <div className="empty-favorites">
-        <p>❤️ Você ainda não favoritou nenhuma receita.</p>
-        <p>Explore as receitas e clique no coração para salvar!</p>
-      </div>
-    ) : (
-      <div className="recipes-grid">
-        {recipes
-          .filter(recipe => favorites.includes(recipe.id))
-          .map(recipe => (
-            <div key={recipe.id} onClick={() => {
-              setSelectedRecipe(recipe);
-              setActiveSection("home");
-            }} style={{cursor: 'pointer'}}>
-              <RecipeCard
-                recipe={recipe}
-                isFavorite={true}
-                onToggleFavorite={handleToggleFavorite}
-              />
-            </div>
-          ))}
-      </div>
-    )}
-  </section>
-)}
-
-        {/* SEÇÃO LOGIN */}
-{activeSection === "login" && (
-  <Login setCurrentUser={setCurrentUser} setActiveSection={setActiveSection} />
-)}
-
-        {/* Aqui você pode adicionar as seções de Contato ou Favoritos depois */}
-        
+        {activeSection === "contact" && <Contact />}
+        {activeSection === "login" && <Login setCurrentUser={setCurrentUser} setActiveSection={setActiveSection} />}
       </main>
-
       <Footer />
     </div>
   );
