@@ -1,16 +1,31 @@
-# React + Vite
+# 🍴 EasyEats - Gestão Inteligente de Receitas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+O **EasyEats** é uma plataforma Full-Stack desenvolvida para o Projeto Integrador (PI), focada em oferecer uma experiência moderna e segura para amantes da culinária. O sistema permite o gerenciamento dinâmico de receitas, autenticação robusta e persistência de dados.
 
-Currently, two official plugins are available:
+## 🚀 Tecnologias Utilizadas
+- **Frontend:** React.js com Vite (Interface SPA rápida e reativa).
+- **Backend:** Node.js com Express (Arquitetura baseada em rotas e middlewares).
+- **Banco de Dados:** MySQL (Persistência relacional para usuários e conteúdo).
+- **Segurança:** - Criptografia de senhas com **Bcrypt**.
+  - Autenticação via **JWT (JSON Web Tokens)**.
+  - Middlewares de proteção de rotas sensíveis.
+  - Persistência local de preferências (Favoritos) via **LocalStorage API**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Funcionalidades Principais
+- [x] **Autenticação:** Cadastro e Login de usuários com tokens de sessão.
+- [x] **Gestão de Conteúdo:** Busca dinâmica e exibição de receitas vindas do banco de dados.
+- [x] **Área do Cozinheiro:** Formulário protegido para adição de novas receitas (apenas para usuários logados).
+- [x] **Favoritos:** Sistema de marcação de receitas favoritas com salvamento automático no navegador.
+- [x] **Canal de Contato:** Formulário de feedback integrado diretamente ao MySQL.
 
-## React Compiler
+## 📋 Como Executar o Projeto
+1. **Banco de Dados:** Inicie o MySQL (via XAMPP) e execute o script `database.sql` para criar as tabelas.
+2. **Ambiente:** No diretório `/backend`, configure o arquivo `.env` com suas credenciais.
+3. **Instalação:** - Na raiz: `npm install`
+   - Em `/backend`: `npm install`
+4. **Execução:**
+   - Backend: `node server.js`
+   - Frontend: `npm run dev`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+*Desenvolvido como parte do currículo acadêmico de Tecnologia.*
