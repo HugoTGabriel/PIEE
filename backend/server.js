@@ -11,7 +11,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const JWT_SECRET = 'easyeats_secret_123';
+// Pega a chave do .env ou usa uma padrão 
+const JWT_SECRET = process.env.JWT_SECRET || 'EuNãoAguentoMaisEssePFC8520';
+
+// Verifica se o usuário está logado antes de permitir certas ações
+const verificarToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Pega o token do cabeçalho "Bearer TOKEN"
+
+  if (!token) {
+    return res.status(403).json({ erro: 'Acesso negado. Token não fornecido.' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ erro: 'Sessão expirada ou token inválido.' });
+    }
+    req.userId = decoded.id; // Salva o ID do usuário para uso posterior se precisar
+    next(); // Permite que a requisição continue para a rota
+  });
+};
 
 // ✅ CADASTRO
 app.post('/api/auth/cadastro', async (req, res) => {
@@ -29,10 +48,12 @@ app.post('/api/auth/cadastro', async (req, res) => {
     );
     res.json({ mensagem: 'Cadastro realizado com sucesso!' });
   } catch (err) {
+    console.error(err);
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ erro: 'Email já cadastrado.' });
+      return res.status(400).json({ erro: 'Este e-mail já está em uso.' });
     }
-    res.status(500).json({ erro: 'Erro ao cadastrar.', detalhe: err.message });
+    //Erro genérico para o usuário
+    res.status(500).json({ erro: 'Ocorreu um erro interno ao processar seu cadastro.' });
   }
 });
 
@@ -40,22 +61,18 @@ app.post('/api/auth/cadastro', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { email, senha } = req.body;
 
-  if (!email || !senha) {
-    return res.status(400).json({ erro: 'Email e senha obrigatórios.' });
-  }
-
   try {
     const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
 
     if (rows.length === 0) {
-      return res.status(401).json({ erro: 'Email ou senha incorretos.' });
+      return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
     }
 
     const user = rows[0];
     const senhaCorreta = await bcrypt.compare(senha, user.senha);
 
     if (!senhaCorreta) {
-      return res.status(401).json({ erro: 'Email ou senha incorretos.' });
+      return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
     }
 
     const token = jwt.sign(
@@ -66,7 +83,35 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({ token, nome: user.nome });
   } catch (err) {
-    res.status(500).json({ erro: 'Erro ao fazer login.', detalhe: err.message });
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao tentar realizar o login.' }); // Erro genérico para o usuário
+  }
+});
+
+// ✅ BUSCAR RECEITAS (Pública)
+app.get('/api/receitas', async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT * FROM receitas');
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Não foi possível carregar as receitas.' });
+  }
+});
+
+// ✅ ADICIONAR RECEITA
+// Incluímos o 'verificarToken'
+app.post('/api/receitas', verificarToken, async (req, res) => {
+  const { titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes } = req.body;
+  try {
+    await pool.execute(
+      'INSERT INTO receitas (titulo, imagem, tempo_preparo, difficulty, ingredients, instructions) VALUES (?, ?, ?, ?, ?, ?)',
+      [titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes]
+    );
+    res.json({ mensagem: 'Receita cadastrada com sucesso!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao salvar a nova receita.' }); //Erro genérico para o usuário
   }
 });
 
@@ -74,45 +119,18 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/contato', async (req, res) => {
   const { nome, email, assunto, reclame } = req.body;
 
-  if (!nome || !email || !assunto || !reclame) {
-    return res.status(400).json({ erro: 'Todos os campos são obrigatórios.' });
-  }
-
   try {
     await pool.execute(
       'INSERT INTO usuario (nome, email, assunto, reclame) VALUES (?, ?, ?, ?)',
       [nome, email, assunto, reclame]
     );
-    res.json({ mensagem: 'Enviado com sucesso!' });
+    res.json({ mensagem: 'Sua mensagem foi enviada com sucesso!' });
   } catch (err) {
-    res.status(500).json({ erro: 'Erro ao salvar.', detalhe: err.message });
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao processar sua mensagem de contato.' }); //Erro genérico para o usuário
   }
 });
 
-// ✅ BUSCAR TODAS AS RECEITAS
-app.get('/api/receitas', async (req, res) => {
-  try {
-    const [rows] = await pool.execute('SELECT * FROM receitas');
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ erro: 'Erro ao buscar receitas.' });
-  }
-});
-
-// ✅ ADICIONAR NOVA RECEITA
-app.post('/api/receitas', async (req, res) => {
-  const { titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes } = req.body;
-  try {
-    await pool.execute(
-      'INSERT INTO receitas (titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes) VALUES (?, ?, ?, ?, ?, ?)',
-      [titulo, imagem, tempo_preparo, dificuldade, ingredientes, instrucoes]
-    );
-    res.json({ mensagem: 'Receita adicionada com sucesso!' });
-  } catch (err) {
-    res.status(500).json({ erro: 'Erro ao salvar receita.' });
-  }
-});
-
-app.listen(process.env.PORT, () => {
-  console.log(`Servidor rodando na porta ${process.env.PORT}`);
+app.listen(process.env.PORT || 3001, () => {
+  console.log(`Servidor rodando na porta ${process.env.PORT || 3001}`);
 });

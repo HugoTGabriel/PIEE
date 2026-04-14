@@ -21,7 +21,13 @@ function App() {
   const [activeSection, setActiveSection] = useState("home");
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [favorites, setFavorites] = useState([]);
+  const [favorites, setFavorites] = useState(() => {
+  // Tenta ler os favoritos guardados no navegador
+  const savedFavorites = localStorage.getItem("favorites");
+  // Se existirem, transforma o texto de volta em lista (JSON.parse)
+  // Se não existirem, começa com uma lista vazia []
+  return savedFavorites ? JSON.parse(savedFavorites) : [];
+});
   // Adicione isso junto com as outras funções (perto do handleLogout)
 const handleToggleFavorite = (id) => {
   setFavorites(prev =>
@@ -62,11 +68,14 @@ useEffect(() => {
   };
   const filteredRecipes = recipes.filter(recipe =>
   recipe.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
+// Este código corre sempre que a lista de 'favorites' mudar
+useEffect(() => {
+  // Guarda a lista de favoritos convertida em texto (JSON.stringify)
+  localStorage.setItem("favorites", JSON.stringify(favorites));
+}, [favorites]); // O [favorites] diz ao React para vigiar especificamente esta variável
 
-
-  
-);
   // 4. O QUE APARECE NA TELA (O Desenho)
   return (
     <div className="app-container">

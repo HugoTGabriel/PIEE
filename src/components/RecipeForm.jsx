@@ -2,34 +2,90 @@ import React, { useState } from 'react';
 
 const RecipeForm = ({ onRecipeAdded }) => {
   const [formData, setFormData] = useState({
-    titulo: '', imagem: '', tempo_preparo: '', dificuldade: 'Fácil', ingredientes: '', instrucoes: ''
+    titulo: '', 
+    imagem: '', 
+    tempo_preparo: '', 
+    dificuldade: 'Fácil', 
+    ingredientes: '', 
+    instrucoes: ''
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const response = await fetch('http://localhost:3001/api/receitas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-    
-    if (response.ok) {
-      alert("Receita salva!");
-      setFormData({ titulo: '', imagem: '', tempo_preparo: '', dificuldade: 'Fácil', ingredientes: '', instrucoes: '' });
-      if (onRecipeAdded) onRecipeAdded();
+
+    //Procura o token que foi guardado no momento do Login
+    const token = localStorage.getItem('token'); 
+
+    if (!token) {
+      alert("Precisas de estar logado para adicionar uma receita!");
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/receitas', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          //Envia o token para o Middleware 'verificarToken' validar
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(formData)
+      });
+      
+      const data = await response.json();
+
+      if (response.ok) {
+        alert("Receita salva com sucesso!");
+        setFormData({ titulo: '', imagem: '', tempo_preparo: '', dificuldade: 'Fácil', ingredientes: '', instrucoes: '' });
+        if (onRecipeAdded) onRecipeAdded();
+      } else {
+        // Exibe a mensagem de erro vinda do servidor
+        alert(data.erro || "Erro ao salvar receita.");
+      }
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      alert("Erro de conexão com o servidor.");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="recipe-form" style={{display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '400px', margin: 'auto'}}>
-      <h3>Nova Receita</h3>
-      <input placeholder="Título" value={formData.titulo} onChange={e => setFormData({...formData, titulo: e.target.value})} required />
-      <input placeholder="URL da Imagem" value={formData.imagem} onChange={e => setFormData({...formData, imagem: e.target.value})} />
-      <input placeholder="Tempo (ex: 30 min)" value={formData.tempo_preparo} onChange={e => setFormData({...formData, tempo_preparo: e.target.value})} />
-      <textarea placeholder="Ingredientes (separados por vírgula)" value={formData.ingredientes} onChange={e => setFormData({...formData, ingredientes: e.target.value})} />
-      <textarea placeholder="Instruções" value={formData.instrucoes} onChange={e => setFormData({...formData, instrucoes: e.target.value})} />
-      <button type="submit" style={{backgroundColor: '#ff6b6b', color: 'white', border: 'none', padding: '10px', borderRadius: '5px'}}>Salvar Receita</button>
-    </form>
+    <div className="recipe-form-container" style={{padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px'}}>
+      <h3>👨‍🍳 Adicionar Nova Receita</h3>
+      <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+        <input 
+          type="text" 
+          placeholder="Título da Receita" 
+          value={formData.titulo} 
+          onChange={e => setFormData({...formData, titulo: e.target.value})} 
+          required 
+        />
+        <input 
+          type="text" 
+          placeholder="Link da Imagem" 
+          value={formData.imagem} 
+          onChange={e => setFormData({...formData, imagem: e.target.value})} 
+        />
+        <input 
+          type="text" 
+          placeholder="Tempo (ex: 45 min)" 
+          value={formData.tempo_preparo} 
+          onChange={e => setFormData({...formData, tempo_preparo: e.target.value})} 
+        />
+        <textarea 
+          placeholder="Ingredientes (separe por vírgulas)" 
+          value={formData.ingredientes} 
+          onChange={e => setFormData({...formData, ingredientes: e.target.value})} 
+        />
+        <textarea 
+          placeholder="Modo de Preparo" 
+          value={formData.instrucoes} 
+          onChange={e => setFormData({...formData, instrucoes: e.target.value})} 
+        />
+        <button type="submit" style={{padding: '10px', cursor: 'pointer', backgroundColor: '#4CAF50', color: 'white', border: 'none'}}>
+          Publicar Receita
+        </button>
+      </form>
+    </div>
   );
 };
 
