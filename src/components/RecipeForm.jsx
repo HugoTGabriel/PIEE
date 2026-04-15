@@ -13,7 +13,6 @@ const RecipeForm = ({ onRecipeAdded }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    //Procura o token que foi guardado no momento do Login
     const token = localStorage.getItem('token'); 
 
     if (!token) {
@@ -26,7 +25,6 @@ const RecipeForm = ({ onRecipeAdded }) => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          //Envia o token para o Middleware 'verificarToken' validar
           'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify(formData)
@@ -39,7 +37,6 @@ const RecipeForm = ({ onRecipeAdded }) => {
         setFormData({ titulo: '', imagem: '', tempo_preparo: '', dificuldade: 'Fácil', ingredientes: '', instrucoes: '' });
         if (onRecipeAdded) onRecipeAdded();
       } else {
-        // Exibe a mensagem de erro vinda do servidor
         alert(data.erro || "Erro ao salvar receita.");
       }
     } catch (error) {

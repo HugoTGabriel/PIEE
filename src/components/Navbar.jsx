@@ -3,7 +3,7 @@ import React from 'react';
 const Navbar = ({ currentUser, setActiveSection, onLogout }) => {
   return (
     <nav className="navbar">
-      {/* 1. O LOGO (Que também funciona como botão para voltar ao início) */}
+      {/* 1. O LOGO */}
       <div 
         className="logo" 
         onClick={() => setActiveSection("home")} 
@@ -24,11 +24,11 @@ const Navbar = ({ currentUser, setActiveSection, onLogout }) => {
           <a href="#contact" onClick={(e) => { e.preventDefault(); setActiveSection("contact"); }}>Contato</a>
         </li>
         
-        {/* 3. A LÓGICA DE LOGIN (O "Pulo do Gato") */}
-        {/* O código abaixo diz: SE o currentUser existir (logado), mostre a primeira parte. SE NÃO, mostre o botão de Entrar. */}
+        {/* 3. A LÓGICA DE LOGIN */}
+        {}
         {currentUser ? (
           <>
-            {/* 👇 AQUI ESTÁ O SEU NOVO LINK DE ADICIONAR RECEITA 👇 */}
+            {}
             <li>
               <a 
                 href="#add-recipe" 
