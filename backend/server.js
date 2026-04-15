@@ -8,10 +8,11 @@ import pool from './db.js';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({origin: 'http://localhost:5173', credentials: true}));
 app.use(express.json());
 
-const JWT_SECRET = process.env.JWT_SECRET || 'easyeats_secret_padrao';
+// 1. CORREÇÃO: O nome da variável agora bate com o resto do código
+const JWT_SECRET = process.env.JWT_SECRET;
 
 //Verifica se o usuário está logado
 const verificarToken = (req, res, next) => {
@@ -56,6 +57,23 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ROTA DE CONTATO
+// 2. CORREÇÃO: Adicionado 'async' e trocado 'db.query' por 'pool.execute'
+app.post('/api/contato', async (req, res) => {
+  const { nome, email, mensagem } = req.body;
+  if (!nome || !email || !mensagem) {
+    return res.status(400).json({ erro: 'Todos os campos são obrigatórios.' });
+  }
+  
+  try {
+    // Insere no banco de dados usando o 'pool' moderno
+    await pool.execute('INSERT INTO contatos (nome, email, mensagem) VALUES (?, ?, ?)', [nome, email, mensagem]);
+    res.status(201).json({ message: 'Contato salvo com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao salvar a mensagem.' });
+  }
+});
+
 // ✅ RECEITAS: Buscar (público) e Criar (protegido)
 app.get('/api/receitas', async (req, res) => {
   try {
@@ -79,4 +97,15 @@ app.post('/api/receitas', verificarToken, async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 3001, () => console.log("Servidor ativo!"));
+// 3. CORREÇÃO: Define a PORTA e remove o listen duplicado
+const PORT = process.env.PORT || 3001;
+
+// Apenas inicia o servidor na porta 3001 se NÃO estiver rodando testes
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Servidor ativo! Porta: ${PORT}`);
+  });
+}
+
+// Exporta o app para os testes
+export default app;
