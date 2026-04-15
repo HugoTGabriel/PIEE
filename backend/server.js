@@ -11,10 +11,8 @@ const app = express();
 app.use(cors({origin: 'http://localhost:5173', credentials: true}));
 app.use(express.json());
 
-// 1. CORREÇÃO: O nome da variável agora bate com o resto do código
 const JWT_SECRET = process.env.JWT_SECRET;
 
-//Verifica se o usuário está logado
 const verificarToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -58,7 +56,6 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ROTA DE CONTATO
-// 2. CORREÇÃO: Adicionado 'async' e trocado 'db.query' por 'pool.execute'
 app.post('/api/contato', async (req, res) => {
   const { nome, email, mensagem } = req.body;
   if (!nome || !email || !mensagem) {
@@ -66,7 +63,6 @@ app.post('/api/contato', async (req, res) => {
   }
   
   try {
-    // Insere no banco de dados usando o 'pool' moderno
     await pool.execute('INSERT INTO contatos (nome, email, mensagem) VALUES (?, ?, ?)', [nome, email, mensagem]);
     res.status(201).json({ message: 'Contato salvo com sucesso!' });
   } catch (err) {
@@ -97,15 +93,12 @@ app.post('/api/receitas', verificarToken, async (req, res) => {
   }
 });
 
-// 3. CORREÇÃO: Define a PORTA e remove o listen duplicado
 const PORT = process.env.PORT || 3001;
 
-// Apenas inicia o servidor na porta 3001 se NÃO estiver rodando testes
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`Servidor ativo! Porta: ${PORT}`);
   });
 }
 
-// Exporta o app para os testes
 export default app;

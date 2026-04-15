@@ -60,7 +60,6 @@ function App() {
           });
         }
 
-        // C. Junta as Locais com as Globais na mesma tela!
         setRecipes([...locais, ...globais]);
 
       } catch (err) {
@@ -97,7 +96,6 @@ function App() {
       if (data.meals) {
         const globalRecipes = data.meals.map(m => {
           
-          // Juntando os ingredientes que a API manda separados
           const ing = [];
           for (let i = 1; i <= 20; i++) {
             if (m[`strIngredient${i}`] && m[`strIngredient${i}`].trim() !== '') {
@@ -111,7 +109,6 @@ function App() {
             image: m.strMealThumb,
             prepTime: "Consultar",
             difficulty: "Global",
-            // Se for busca por ingrediente, a API não manda as instruções junto, avisamos na tela:
             ingredients: ing.length > 0 ? ing : ["Ingredientes não detalhados nesta busca rápida."],
             instructions: m.strInstructions 
               ? m.strInstructions
@@ -123,7 +120,6 @@ function App() {
           };
         });
         setRecipes(globalRecipes);
-        // Volta para a lista caso o usuário já esteja com alguma receita aberta
         setSelectedRecipe(null); 
       } else {
         alert("Nenhuma receita encontrada no banco global para essa busca.");
@@ -137,7 +133,7 @@ function App() {
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
 
-  // 4. Nova função: Busca os detalhes completos ao clicar
+  //Busca os detalhes completos ao clicar
   const handleRecipeClick = async (recipe) => {
 
     window.history.pushState({ receitaAberta: true }, "", `#receita-${recipe.id}`);
@@ -149,7 +145,7 @@ function App() {
 
     // Se a receita está "incompleta", pedimos os detalhes para a API usando o ID dela
     try {
-      const idReal = recipe.id.replace('api-', ''); // Tira o 'api-' que colocamos antes
+      const idReal = recipe.id.replace('api-', ''); 
       const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idReal}`);
       const data = await res.json();
       
@@ -175,7 +171,7 @@ function App() {
             : ["Instruções não disponíveis."]
         };
         
-        setSelectedRecipe(receitaCompleta); // Abre a tela com tudo preenchido!
+        setSelectedRecipe(receitaCompleta);
       }
     } catch (err) {
       console.error("Erro ao buscar detalhes da receita:", err);
@@ -202,7 +198,7 @@ function App() {
         {activeSection === "home" && (
           <section className="section active">
             
-            {/* TELA 1: LISTA DE RECEITAS E BARRA DE BUSCA */}
+            {/* LISTA DE RECEITAS E BARRA DE BUSCA */}
             {!selectedRecipe && (
               <>
                 <SearchBar onSearch={handleGlobalSearch} />
@@ -214,7 +210,7 @@ function App() {
                         recipe={recipe} 
                         isFavorite={favorites.includes(recipe.id)} 
                         onToggleFavorite={(id, e) => {
-                          e.stopPropagation(); // 🛡️ Impede de abrir a receita ao favoritar
+                          e.stopPropagation();
                           handleToggleFavorite(id);
                         }} 
                       />
@@ -224,7 +220,7 @@ function App() {
               </>
             )}
 
-            {/* TELA 2: DETALHES DA RECEITA (Quando você clica nela) */}
+            {/* DETALHES DA RECEITA */}
             {selectedRecipe && (
               <div className="recipe-detail active">
                 <button 
@@ -268,7 +264,7 @@ function App() {
           </section>
         )}
 
-        {/* ✅ SEÇÃO DE FAVORITOS (O "buraquinho" que faltava) */}
+        {/* ✅ SEÇÃO DE FAVORITOS */}
         {activeSection === "favorites" && (
           <section className="section active">
             <h2 className="section-title">Minhas Receitas Favoritas</h2>
@@ -296,7 +292,7 @@ function App() {
           </section>
         )}
 
-        {/* ✅ SEÇÃO DE ADICIONAR RECEITA (O formulário fantasma) */}
+        {/* ✅ SEÇÃO DE ADICIONAR RECEITA*/}
         {activeSection === "add-recipe" && (
           <section className="section active">
             <RecipeForm onRecipeAdded={() => {
